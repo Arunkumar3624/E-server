@@ -311,6 +311,49 @@ app.get("/my-orders", authMiddleware, async (req, res) => {
   }
 });
 
+app.get("/my-orders/:id", authMiddleware, async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const orderResult = await pool.query(
+      `SELECT 
+        orders.id,
+        orders.total_price,
+        orders.payment_method,
+        orders.status,
+        orders.created_at
+       FROM orders
+       WHERE orders.id = $1 AND orders.user_id = $2`,
+      [id, req.user.id],
+    );
+
+    if (orderResult.rows.length === 0) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+
+    const itemsResult = await pool.query(
+      `SELECT 
+        order_details.id,
+        products.name,
+        products.image_url,
+        products.category,
+        order_details.quantity,
+        order_details.price
+       FROM order_details
+       JOIN products ON order_details.product_id = products.id
+       WHERE order_details.order_id = $1`,
+      [id],
+    );
+
+    res.json({
+      order: orderResult.rows[0],
+      items: itemsResult.rows,
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 // --------------------
 // DELETE ORDER
 // --------------------
